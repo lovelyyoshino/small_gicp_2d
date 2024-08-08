@@ -1,100 +1,81 @@
-
 // SPDX-FileCopyrightText: Copyright 2024 Kenji Koide
 // SPDX-License-Identifier: MIT
 #pragma once
 
 #include <Eigen/Core>
-#include <memory>
-#include <vector>
-
-#include "traits_gicp.hpp"
 
 namespace small_gicp {
 
-/**
- * @brief Point cloud
- */
-struct PointCloud {
-public:
-    using Ptr = std::shared_ptr<PointCloud>;
-    using ConstPtr = std::shared_ptr<const PointCloud>;
-
-    /// @brief Constructor
-    PointCloud() {}
-
-    /// @brief Constructor
-    /// @param points  Points to initialize the point cloud
-    template <typename T, int D, typename Allocator>
-    explicit PointCloud(const std::vector<Eigen::Matrix<T, D, 1>, Allocator>& points) {
-        this->resize(points.size());
-        for (size_t i = 0; i < points.size(); i++) {
-            this->point(i) << points[i].template cast<double>().template head<2>(), 1.0;
-        }
-    }
-
-    /// @brief Destructor
-    ~PointCloud() {}
-
-    /// @brief Number of points.
-    size_t size() const { return points.size(); }
-
-    /// @brief Check if the point cloud is empty.
-    bool empty() const { return points.empty(); }
-
-    /// @brief Resize point/normal/cov buffers.
-    /// @param n  Number of points
-    void resize(size_t n) {
-        points.resize(n);
-        normals.resize(n);
-        covs.resize(n);
-    }
-
-    /// @brief Get i-th point.
-    Eigen::Vector3d& point(size_t i) { return points[i]; }
-
-    /// @brief Get i-th normal.
-    Eigen::Vector3d& normal(size_t i) { return normals[i]; }
-
-    /// @brief Get i-th covariance.
-    Eigen::Matrix3d& cov(size_t i) { return covs[i]; }
-
-    /// @brief Get i-th point (const).
-    const Eigen::Vector3d& point(size_t i) const { return points[i]; }
-
-    /// @brief Get i-th normal (const).
-    const Eigen::Vector3d& normal(size_t i) const { return normals[i]; }
-
-    /// @brief Get i-th covariance (const).
-    const Eigen::Matrix3d& cov(size_t i) const { return covs[i]; }
-
-public:
-    std::vector<Eigen::Vector3d> points;   ///< Point coordinates (x, y, z, 1)
-    std::vector<Eigen::Vector3d> normals;  ///< Point normals (nx, ny, nz, 0)
-    std::vector<Eigen::Matrix3d> covs;     ///< Point covariances (3x3 matrix) + zero padding
-};
-
 namespace traits {
 
-template <>
-struct Traits<PointCloud> {
-    using Points = PointCloud;
+template <typename T>
+struct Traits;
 
-    static size_t size(const Points& points) { return points.size(); }
+/// @brief  Get the number of points.
+template <typename T>
+size_t size(const T& points) {
+  return Traits<T>::size(points);
+}
 
-    static bool has_points(const Points& points) { return !points.points.empty(); }
-    static bool has_normals(const Points& points) { return !points.normals.empty(); }
-    static bool has_covs(const Points& points) { return !points.covs.empty(); }
+/// @brief Check if the point cloud has points.
+template <typename T>
+bool has_points(const T& points) {
+  return Traits<T>::has_points(points);
+}
 
-    static const Eigen::Vector3d& point(const Points& points, size_t i) { return points.point(i); }
-    static const Eigen::Vector3d& normal(const Points& points, size_t i) { return points.normal(i); }
-    static const Eigen::Matrix3d& cov(const Points& points, size_t i) { return points.cov(i); }
+/// @brief Check if the point cloud has normals.
+template <typename T>
+bool has_normals(const T& points) {
+  return Traits<T>::has_normals(points);
+}
 
-    static void resize(Points& points, size_t n) { points.resize(n); }
-    static void set_point(Points& points, size_t i, const Eigen::Vector3d& pt) { points.point(i) = pt; }
-    static void set_normal(Points& points, size_t i, const Eigen::Vector3d& n) { points.normal(i) = n; }
-    static void set_cov(Points& points, size_t i, const Eigen::Matrix3d& cov) { points.cov(i) = cov; }
-};
+/// @brief Check if the point cloud has covariances.
+template <typename T>
+bool has_covs(const T& points) {
+  return Traits<T>::has_covs(points);
+}
+
+/// @brief Get i-th point. 4D vector is used to take advantage of SIMD intrinsics. The last element must be filled by one (x, y, z, 1).
+template <typename T>
+auto point(const T& points, size_t i) {
+  return Traits<T>::point(points, i);
+}
+
+/// @brief Get i-th normal. 4D vector is used to take advantage of SIMD intrinsics. The last element must be filled by zero (nx, ny, nz, 0).
+template <typename T>
+auto normal(const T& points, size_t i) {
+  return Traits<T>::normal(points, i);
+}
+
+/// @brief Get i-th covariance. Only the top-left 3x3 matrix is filled, and the bottom row and the right col must be filled by zero.
+template <typename T>
+auto cov(const T& points, size_t i) {
+  return Traits<T>::cov(points, i);
+}
+
+/// @brief Resize the point cloud (this function should resize all attributes)
+template <typename T>
+void resize(T& points, size_t n) {
+  Traits<T>::resize(points, n);
+}
+
+/// @brief Set i-th point. (x, y, z, 1)
+template <typename T>
+void set_point(T& points, size_t i, const Eigen::Vector3d& pt) {
+  Traits<T>::set_point(points, i, pt);
+}
+
+/// @brief Set i-th normal. (nx, nz, nz, 0)
+template <typename T>
+void set_normal(T& points, size_t i, const Eigen::Vector3d& pt) {
+  Traits<T>::set_normal(points, i, pt);
+}
+
+/// @brief Set i-th covariance. Only the top-left 3x3 matrix should be filled.
+template <typename T>
+void set_cov(T& points, size_t i, const Eigen::Matrix3d& cov) {
+  Traits<T>::set_cov(points, i, cov);
+}
 
 }  // namespace traits
-
 }  // namespace small_gicp

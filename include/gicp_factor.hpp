@@ -7,8 +7,6 @@
 #include "ann/traits.hpp"
 #include "traits_gicp.hpp"
 #include "lie.hpp"
-#include "sophus/se2.hpp"
-#include "sophus/so2.hpp"
 
 namespace small_gicp {
 

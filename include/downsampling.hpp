@@ -6,6 +6,7 @@
 #include <memory>
 #include <random>
 #include <unordered_map>
+#include <algorithm> 
 
 #include "ann/vector3i_hash.hpp"
 #include "ann/fast_floor.hpp"
